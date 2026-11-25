@@ -8,14 +8,11 @@ return new class extends Migration
 {
     public function up(): void
     {
-        // Limpia las tablas creadas parcialmente antes del error de longitud de FK
         Schema::dropIfExists('inclusion_informe_periodo_materias');
         Schema::dropIfExists('inclusion_informes_periodos');
         Schema::dropIfExists('inclusion_ppi_materias');
         Schema::dropIfExists('inclusion_ppis');
         Schema::dropIfExists('inclusion_informes_iniciales');
-
-        // 1. Informe Pedagógico Inicial (Línea base de principio de año)
         Schema::create('inclusion_informes_iniciales', function (Blueprint $table) {
             $table->id();
             $table->foreignId('legajo_inclusion_id')->constrained('legajos_inclusion')->cascadeOnDelete();
@@ -29,8 +26,6 @@ return new class extends Migration
 
             $table->unique(['legajo_inclusion_id', 'ciclo_lectivo_id'], 'inc_inicial_legajo_ciclo_unique');
         });
-
-        // 2. PPI - Proyecto Pedagógico Individual (Encabezado anual)
         Schema::create('inclusion_ppis', function (Blueprint $table) {
             $table->id();
             $table->foreignId('legajo_inclusion_id')->constrained('legajos_inclusion')->cascadeOnDelete();
@@ -43,7 +38,6 @@ return new class extends Migration
             $table->unique(['legajo_inclusion_id', 'ciclo_lectivo_id'], 'inc_ppi_legajo_ciclo_unique');
         });
 
-        // 3. PPI - Planificación y ajustes por materia del grado
         Schema::create('inclusion_ppi_materias', function (Blueprint $table) {
             $table->id();
             $table->foreignId('inclusion_ppi_id')->constrained('inclusion_ppis')->cascadeOnDelete();
@@ -55,7 +49,6 @@ return new class extends Migration
             $table->unique(['inclusion_ppi_id', 'materia_id'], 'inc_ppi_materia_unique');
         });
 
-        // 4. Informes Trimestrales (1°, 2°, 3° Término) e Informe Final Anual
         Schema::create('inclusion_informes_periodos', function (Blueprint $table) {
             $table->id();
             $table->foreignId('legajo_inclusion_id')->constrained('legajos_inclusion')->cascadeOnDelete();
@@ -69,7 +62,6 @@ return new class extends Migration
             $table->unique(['legajo_inclusion_id', 'ciclo_lectivo_id', 'periodo'], 'inc_periodo_legajo_ciclo_unique');
         });
 
-        // 5. Notas (1 a 10 o vacío) y avances por materia en cada período
         Schema::create('inclusion_informe_periodo_materias', function (Blueprint $table) {
             $table->id();
             $table->foreignId('inclusion_informe_periodo_id')

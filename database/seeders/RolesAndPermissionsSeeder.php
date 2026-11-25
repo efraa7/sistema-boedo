@@ -15,29 +15,22 @@ class RolesAndPermissionsSeeder extends Seeder
         app()[PermissionRegistrar::class]->forgetCachedPermissions();
 
         $permisos = [
-            // permisos admin
             'listar usuarios', 'crear usuarios', 'ver usuarios', 'editar usuarios', 'eliminar usuarios',
             'listar roles', 'crear roles', 'ver roles', 'editar roles', 'eliminar roles',
             'listar permisos', 'crear permisos', 'editar permisos', 'eliminar permisos',
 
-            // permisos docentes
             'listar grados', 'crear grados', 'ver grados', 'editar grados', 'eliminar grados',
             'listar materias', 'crear materias', 'ver materias', 'editar materias', 'eliminar materias',
 
-            // permisos alumnos
             'listar alumnos', 'crear alumnos', 'ver alumnos', 'editar alumnos', 'eliminar alumnos',
 
-            // cud / inclusión
             'listar inclusion', 'crear inclusion', 'ver inclusion', 'editar inclusion', 'eliminar inclusion', 'gestionar inclusion',
 
-            // cuaderno auxiliar
             'listar cuadernos', 'crear cuadernos', 'ver cuadernos', 'editar cuadernos', 'visar cuadernos', 'aprobar cuadernos',
 
-            // copa de leche, cuadro honor, reportes pdf y excel
             'listar copa leche', 'registrar copa leche', 'editar copa leche', 'eliminar copa leche',
             'ver cuadro honor', 'gestionar cuadro honor', 'descargar reportes',
 
-            // ciclos lectivos
             'listar ciclos', 'crear ciclos', 'editar ciclos', 'eliminar ciclos',
         ];
 
@@ -128,7 +121,6 @@ class RolesAndPermissionsSeeder extends Seeder
         );
         $administrativo->syncRoles([$rolAdministrativo]);
 
-        // 3 Vicedirectoras
         $vicedirectoresData = [
             1 => ['dni' => '22333441', 'apellido' => 'Gómez', 'name' => 'María Elena', 'telefono' => '3874000011'],
             2 => ['dni' => '22333442', 'apellido' => 'Mendoza', 'name' => 'Patricia Beatriz', 'telefono' => '3874000012'],
@@ -148,8 +140,6 @@ class RolesAndPermissionsSeeder extends Seeder
             $vicedirectores[$num] = $vice;
         }
 
-        // 14 Docentes titulares (1..7 Turno Mañana, 8..14 Turno Tarde)
-        // Repartidos equitativamente entre las 3 vicedirectoras: Vice 1 (5), Vice 2 (5), Vice 3 (4)
         $docentesData = [
             1  => ['dni' => '32777801', 'apellido' => 'Flores',     'name' => 'Laura Silvina',      'vice' => 1],
             2  => ['dni' => '32777802', 'apellido' => 'Romero',     'name' => 'Valeria Soledad',    'vice' => 1],
@@ -183,7 +173,6 @@ class RolesAndPermissionsSeeder extends Seeder
             $docente->syncRoles([$rolDocente]);
         }
 
-        // 2 MAI (Maestras de Apoyo a la Inclusión)
         $pedagogicosData = [
             1 => ['dni' => '33888991', 'apellido' => 'Salazar', 'name' => 'Romina Andrea',   'telefono' => '3874000051'],
             2 => ['dni' => '33888992', 'apellido' => 'Torres',  'name' => 'Natalia Verónica', 'telefono' => '3874000052'],

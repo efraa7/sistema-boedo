@@ -78,23 +78,32 @@ class CuadernoAuxiliarController extends Controller implements HasMiddleware
             ? (string) $request->input('ciclo_id')
             : ($cicloActivo?->id ? (string) $cicloActivo->id : '');
 
-        $periodoFiltro = $request->filled('periodo')
+        $periodoFiltro =$request->filled('periodo')
             ? (string) $request->input('periodo')
             : '';
 
-        $gradoFiltro = $request->filled('grado_id')
+        $gradoFiltro =$request->filled('grado_id')
             ? (string) $request->input('grado_id')
             : '';
 
-        $buscarFiltro = $request->filled('buscar')
+        $buscarFiltro =$request->filled('buscar')
             ? trim((string) $request->input('buscar'))
             : '';
 
-        $ordenFiltro = $request->filled('orden')
+        $ordenFiltro =$request->filled('orden')
             ? (string) $request->input('orden')
             : 'grado_asc';
 
-        $query = $this->aplicarFiltroPorRol(
+        $estadosPrioridadPermitidos = ['enviado_vicedireccion', 'aprobado'];
+        if ($user->hasAnyRole(['docente', 'super-admin'])) {$estadosPrioridadPermitidos[] = 'borrador';
+        }
+
+        $estadoPrioridadFiltro =$request->filled('estado_prioridad')
+            && in_array((string) $request->input('estado_prioridad'),$estadosPrioridadPermitidos, true)
+            ? (string) $request->input('estado_prioridad')
+            : '';
+
+        $query =$this->aplicarFiltroPorRol(
             CuadernoAuxiliar::query()
                 ->leftJoin('grados', 'cuadernos_auxiliares.grado_id', '=', 'grados.id')
                 ->select('cuadernos_auxiliares.*')
@@ -102,35 +111,31 @@ class CuadernoAuxiliarController extends Controller implements HasMiddleware
             $user
         );
 
-        if ($cicloIdSeleccionado !== '' && $cicloIdSeleccionado !== 'todos') {
-            $query->where('cuadernos_auxiliares.ciclo_lectivo_id', (int) $cicloIdSeleccionado);
+        if ($cicloIdSeleccionado !== '' &&$cicloIdSeleccionado !== 'todos') {
+            $query->where('cuadernos_auxiliares.ciclo_lectivo_id', (int)$cicloIdSeleccionado);
         }
 
         if ($periodoFiltro !== '') {
-            $query->where('cuadernos_auxiliares.periodo', $periodoFiltro);
+            $query->where('cuadernos_auxiliares.periodo',$periodoFiltro);
         }
 
         if ($gradoFiltro !== '') {
-            $query->where('cuadernos_auxiliares.grado_id', (int) $gradoFiltro);
+            $query->where('cuadernos_auxiliares.grado_id', (int)$gradoFiltro);
         }
 
-        if ($buscarFiltro !== '') {
-            $query->where(function (Builder $q) use ($buscarFiltro) {
-                // Ej: "3° B", "3 B", "3ro A", "3b"
-                if (preg_match('/^\s*(\d+)\s*(?:°|º|ro|do|to|mo)?\s*([a-zA-Z])\s*$/iu', $buscarFiltro, $m)) {
-                    $q->where('grados.numero', (int) $m[1])
+        if ($buscarFiltro !== '') {$query->where(function (Builder $q) use ($buscarFiltro) {
+                if (preg_match('/^\s*(\d+)\s*(?:°|º|ro|do|to|mo)?\s*([a-zA-Z])\s*$/iu', $buscarFiltro,$m)) {
+                    $q->where('grados.numero', (int)$m[1])
                         ->where('grados.division', 'like', '%' . mb_strtoupper($m[2]) . '%');
                     return;
                 }
 
-                // Ej: "3", "3°", "3ro", "1ro", "2do"
-                if (preg_match('/^\s*(\d+)\s*(?:°|º|ro|do|to|mo)?\s*$/iu', $buscarFiltro, $m)) {
-                    $q->where('grados.numero', (int) $m[1]);
+                if (preg_match('/^\s*(\d+)\s*(?:°|º|ro|do|to|mo)?\s*$/iu', $buscarFiltro,$m)) {
+                    $q->where('grados.numero', (int)$m[1]);
                     return;
                 }
 
-                // Ej: "A", "B", "Tarde", "Mañana" o apellido/nombre del docente
-                $like = '%' . $buscarFiltro . '%';
+                $like = '%' .$buscarFiltro . '%';
                 $q->where('grados.division', 'like',$like)
                     ->orWhere('grados.turno', 'like', $like)
                     ->orWhereRaw("CONCAT(grados.numero, '° ', grados.division) LIKE ?", [$like])
@@ -140,6 +145,12 @@ class CuadernoAuxiliarController extends Controller implements HasMiddleware
                             ->orWhere('name', 'like', $like);
                     });
             });
+        }
+
+        if ($estadoPrioridadFiltro !== '') {$query->orderByRaw(
+                'CASE WHEN cuadernos_auxiliares.estado = ? THEN 0 ELSE 1 END ASC',
+                [$estadoPrioridadFiltro]
+            );
         }
 
         match ($ordenFiltro) {
@@ -154,7 +165,6 @@ class CuadernoAuxiliarController extends Controller implements HasMiddleware
             ->paginate(10)
             ->withQueryString();
 
-        // Hojas disponibles para el modal de exportación según el rol y el ciclo seleccionado
         $cuadernosDisponiblesQuery =$this->aplicarFiltroPorRol(
             CuadernoAuxiliar::with(['docente', 'grado', 'cicloLectivo']),
             $user
@@ -195,7 +205,6 @@ class CuadernoAuxiliarController extends Controller implements HasMiddleware
             $gradosFiltroQuery->where('docente_titular_id',$user->id);
         }
 
-        // Grados disponibles para CREAR una nueva hoja (solo ciclo activo y grado habilitado según rol)
         $gradosCrearQuery = Grado::where('estado', true)
             ->when($cicloActivo, fn ($q) => $q->where('ciclo_lectivo_id',$cicloActivo->id))
             ->orderBy('numero')
@@ -222,6 +231,7 @@ class CuadernoAuxiliarController extends Controller implements HasMiddleware
                 'grado_id' => $gradoFiltro,
                 'buscar' => $buscarFiltro,
                 'orden' => $ordenFiltro,
+                'estado_prioridad' => $estadoPrioridadFiltro,
             ],
         ]);
     }

@@ -71,6 +71,59 @@ class GradoController extends Controller implements HasMiddleware
             ->map(fn($id) => (int) $id)
             ->all();
     }
+    private function obtenerDocentesDisponibles(?User $user)
+    {
+        $alcance = $this->resolverAlcanceGrados($user);
+
+        $query = User::role('docente')
+            ->where('estado', true)
+            ->orderBy('apellido')
+            ->orderBy('name');
+
+        if ($alcance === 'vicedirector' && $user) {
+            $query->where('vicedirector_id', $user->id);
+        } elseif (!in_array($alcance, ['total', 'vicedirector'], true)) {
+            $query->whereRaw('1 = 0');
+        }
+
+        return $query->get(['id', 'dni', 'apellido', 'name']);
+    }
+
+    private function reglasDocenteTitular(?User $user): array
+    {
+        $alcance = $this->resolverAlcanceGrados($user);
+
+        return [
+            'nullable',
+            'integer',
+            function (string $attribute, mixed $value, \Closure $fail) use ($alcance, $user) {
+                if ($value === null || $value === '') {
+                    return;
+                }
+
+                if (!in_array($alcance, ['total', 'vicedirector'], true)) {
+                    $fail('No tenés autorización para asignar un docente titular.');
+                    return;
+                }
+
+                $query = User::role('docente')
+                    ->where('estado', true)
+                    ->where('id', (int) $value);
+
+                if ($alcance === 'vicedirector' && $user) {
+                    $query->where('vicedirector_id', $user->id);
+                }
+
+                if (!$query->exists()) {
+                    $fail(
+                        $alcance === 'vicedirector'
+                        ? 'El docente seleccionado no es válido o no se encuentra bajo tu cargo.'
+                        : 'El docente titular seleccionado no es válido o está inactivo.'
+                    );
+                }
+            },
+        ];
+    }
 
     private function aplicarFiltroScopeGrados(EloquentBuilder|QueryBuilder $query, ?User $user): void
     {
@@ -83,7 +136,7 @@ class GradoController extends Controller implements HasMiddleware
         if ($alcance === 'vicedirector' && $user) {
             $docentesIds = $this->obtenerDocentesACargoIds($user);
             $query->where(function ($q) use ($docentesIds) {
-                if (! empty($docentesIds)) {
+                if (!empty($docentesIds)) {
                     $q->whereIn('docente_titular_id', $docentesIds);
                 }
                 $q->orWhereNull('docente_titular_id');
@@ -312,7 +365,7 @@ class GradoController extends Controller implements HasMiddleware
         ]);
     }
 
-    public function create(): Response|RedirectResponse
+    public function create(Request $request): Response|RedirectResponse
     {
         $ciclosAbiertos = CicloLectivo::where('cerrado', false)
             ->orderByDesc('anio')
@@ -325,11 +378,7 @@ class GradoController extends Controller implements HasMiddleware
 
         return Inertia::render('grados/create', [
             'ciclosLectivos' => $ciclosAbiertos,
-            'docentes' => User::role('docente')
-                ->where('estado', true)
-                ->orderBy('apellido')
-                ->orderBy('name')
-                ->get(['id', 'dni', 'apellido', 'name']),
+            'docentes' => $this->obtenerDocentesDisponibles($request->user()),
             'materias' => Materia::where('estado', true)
                 ->orderBy('es_especial')
                 ->orderBy('nombre')
@@ -344,7 +393,7 @@ class GradoController extends Controller implements HasMiddleware
                 'required',
                 Rule::exists('ciclos_lectivos', 'id')->where('cerrado', false),
             ],
-            'docente_titular_id' => ['nullable', 'exists:users,id'],
+            'docente_titular_id' => $this->reglasDocenteTitular($request->user()),
             'numero' => ['required', 'integer', 'between:1,7'],
             'division' => [
                 'required',
@@ -405,11 +454,7 @@ class GradoController extends Controller implements HasMiddleware
                 'estado' => $grado->estado,
             ],
             'ciclosLectivos' => CicloLectivo::where('cerrado', false)->orderByDesc('anio')->get(),
-            'docentes' => User::role('docente')
-                ->where('estado', true)
-                ->orderBy('apellido')
-                ->orderBy('name')
-                ->get(['id', 'dni', 'apellido', 'name']),
+            'docentes' => $this->obtenerDocentesDisponibles($request->user()),
         ]);
     }
 
@@ -433,7 +478,7 @@ class GradoController extends Controller implements HasMiddleware
                 'required',
                 Rule::exists('ciclos_lectivos', 'id')->where('cerrado', false),
             ],
-            'docente_titular_id' => ['nullable', 'exists:users,id'],
+            'docente_titular_id' => $this->reglasDocenteTitular($request->user()),
             'numero' => ['required', 'integer', 'between:1,7'],
             'division' => [
                 'required',

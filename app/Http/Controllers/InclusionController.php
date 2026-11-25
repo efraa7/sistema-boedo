@@ -269,7 +269,6 @@ class InclusionController extends Controller implements HasMiddleware
 
         $docentesViceIds = $alcance === 'vicedirector' ? $this->obtenerDocentesACargoIds($user) : [];
 
-        // Grados disponibles en el filtro estrictamente acotados al rol del usuario
         $gradosQuery = Grado::query()
             ->when($cicloId, fn ($q) => $q->where('ciclo_lectivo_id', $cicloId));
 
@@ -302,7 +301,6 @@ class InclusionController extends Controller implements HasMiddleware
             ->orderBy('turno')
             ->get(['id', 'ciclo_lectivo_id', 'numero', 'division', 'turno']);
 
-        // Evitar que un parámetro grado_id manipulado en la URL filtre un grado ajeno al rol
         $gradosPermitidosIds = $grados->pluck('id')->map(fn ($id) => (int) $id)->all();
         if ($gradoId && ! in_array((int) $gradoId, $gradosPermitidosIds, true)) {
             $gradoId = '';
@@ -789,7 +787,6 @@ class InclusionController extends Controller implements HasMiddleware
             'observaciones_ppi' => ['nullable', 'string'],
         ]);
 
-        // Si es Vicedirector, validar que el alumno pertenezca a un grado de sus docentes a cargo
         if ($this->resolverRolAlcance($user) === 'vicedirector') {
             $docentesViceIds = $this->obtenerDocentesACargoIds($user);
             $cicloActivo = CicloLectivo::where('cerrado', false)->orderByDesc('anio')->first();

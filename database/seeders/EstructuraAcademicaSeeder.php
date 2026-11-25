@@ -15,7 +15,6 @@ class EstructuraAcademicaSeeder extends Seeder
 {
     public function run(): void
     {
-        // 1. Ciclos Lectivos: 2025 (cerrado) y 2026 (activo)
         $ciclo2025 = CicloLectivo::firstOrCreate(
             ['anio' => 2025],
             [
@@ -34,7 +33,6 @@ class EstructuraAcademicaSeeder extends Seeder
             ]
         );
 
-        // 2. Catálogo de Materias
         $catalogoMaterias = [
             ['codigo' => 'LEN', 'nombre' => 'Lengua', 'es_especial' => false],
             ['codigo' => 'MAT', 'nombre' => 'Matemática', 'es_especial' => false],
@@ -60,11 +58,9 @@ class EstructuraAcademicaSeeder extends Seeder
             $materiasIds[] = $materia->id;
         }
 
-        // 3. Crear 14 grados (1° a 7° Mañana y 1° a 7° Tarde) para cada ciclo
         $grados2025 = $this->crearGradosParaCiclo($ciclo2025, $materiasIds);
         $grados2026 = $this->crearGradosParaCiclo($ciclo2026, $materiasIds);
 
-        // 4. Sembrar 5 alumnos base por cada grado de 2025 (14 grados x 5 = 70 alumnos)
         $alumnos2025PorAula = [
             'Mañana' => [],
             'Tarde' => [],
@@ -91,13 +87,11 @@ class EstructuraAcademicaSeeder extends Seeder
             }
         }
 
-        // 5. Promocionar alumnos de 2025 a 2026 + agregar 2 compañeros nuevos por grado en 2026
         foreach (['Mañana', 'Tarde'] as $turno) {
             for ($num = 1; $num <= 7; $num++) {
                 $grado2026 = $grados2026[$turno][$num];
 
                 if ($num === 1) {
-                    // 1.° Grado 2026: 5 ingresantes base + 2 nuevos = 7 alumnos
                     $ingresantes = Alumno::factory()
                         ->count(7)
                         ->paraIngreso(1, 2026)
@@ -112,7 +106,6 @@ class EstructuraAcademicaSeeder extends Seeder
                         ]);
                     }
                 } else {
-                    // 2.° a 7.° Grado 2026: los 5 promovidos del grado anterior (2025) + 2 compañeros nuevos
                     $promovidos = $alumnos2025PorAula[$turno][$num - 1];
 
                     foreach ($promovidos as $alumnoPromovido) {
@@ -141,7 +134,6 @@ class EstructuraAcademicaSeeder extends Seeder
             }
         }
 
-        // 6. Crear 6 alumnos con Legajo de Inclusión (3 para MAI 1 y 3 para MAI 2) como alumnos extra
         $mai1 = User::where('email', 'pedagogico1@escuelaboedo.edu.ar')->first();
         $mai2 = User::where('email', 'pedagogico2@escuelaboedo.edu.ar')->first();
 
@@ -205,7 +197,6 @@ class EstructuraAcademicaSeeder extends Seeder
                 ->paraIngreso($gradoNum2025, 2025)
                 ->create();
 
-            // Matrícula 2025 (alumno extra -> ese aula pasa de 5 a 6 alumnos)
             Matricula::create([
                 'alumno_id' => $alumnoInc->id,
                 'grado_id' => $grados2025[$turno][$gradoNum2025]->id,
@@ -213,7 +204,6 @@ class EstructuraAcademicaSeeder extends Seeder
                 'dictamen_3er_trimestre' => 'Promovido',
             ]);
 
-            // Matrícula 2026 (promociona -> ese aula pasa de 7 a 8 alumnos)
             Matricula::create([
                 'alumno_id' => $alumnoInc->id,
                 'grado_id' => $grados2026[$turno][$gradoNum2026]->id,
@@ -233,7 +223,6 @@ class EstructuraAcademicaSeeder extends Seeder
             ]);
         }
 
-        // 7. Ajustar Copa de Leche entre 80% y 95% en cada grado de ambos ciclos
         $this->aplicarCoberturaCopaDeLeche($ciclo2025);
         $this->aplicarCoberturaCopaDeLeche($ciclo2026);
     }
@@ -260,7 +249,6 @@ class EstructuraAcademicaSeeder extends Seeder
             7 => 'Aula 7 (Planta Alta)',
         ];
 
-        // Turno Mañana: docente1 .. docente7
         for ($num = 1; $num <= 7; $num++) {
             $docente = User::where('email', "docente{$num}@escuelaboedo.edu.ar")->first();
 
@@ -282,7 +270,6 @@ class EstructuraAcademicaSeeder extends Seeder
             $resultado['Mañana'][$num] = $grado;
         }
 
-        // Turno Tarde: docente8 .. docente14
         for ($num = 1; $num <= 7; $num++) {
             $docenteIdx = $num + 7;
             $docente = User::where('email', "docente{$docenteIdx}@escuelaboedo.edu.ar")->first();
@@ -328,7 +315,6 @@ class EstructuraAcademicaSeeder extends Seeder
                 continue;
             }
 
-            // Para 5 -> 4 (80%), para 6 -> 5 (83.3%), para 7 -> 6 (85.7%), para 8 -> 7 (87.5%)
             $minBeneficiarios = (int) ceil($total * 0.80);
             $maxBeneficiarios = max($minBeneficiarios, (int) floor($total * 0.95));
             $cantidadObjetivo = random_int($minBeneficiarios, $maxBeneficiarios);

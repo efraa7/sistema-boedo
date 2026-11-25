@@ -47,7 +47,6 @@ class CopaLecheController extends Controller implements HasMiddleware
         $buscar = trim((string) $request->input('buscar', ''));
         $turno = (string) $request->input('turno', '');
 
-        // Filtros para la pestaña de Padrón Rápido de Alumnos
         $tab = (string) $request->input('tab', 'grados');
         $buscarAlumno = trim((string) $request->input('buscar_alumno', ''));
         $gradoAlumnoId = (string) $request->input('grado_alumno_id', '');
@@ -100,7 +99,6 @@ class CopaLecheController extends Controller implements HasMiddleware
 
         $esDocente = $this->esSoloDocente($user);
 
-        // 1. Consulta para totales reales (sin paginar)
         $gradosTotalesQuery = Grado::query()
             ->where('ciclo_lectivo_id', $cicloActivo->id)
             ->where('estado', true)
@@ -121,7 +119,6 @@ class CopaLecheController extends Controller implements HasMiddleware
         $turnoManana = $gradosTotales->where('turno', 'Mañana')->sum('total_copa_leche');
         $turnoTarde = $gradosTotales->where('turno', 'Tarde')->sum('total_copa_leche');
 
-        // 2. Consulta paginada por Grado y Sección (soporta minúsculas, "1", "1°", "a", "1 a", etc.)
         $gradosPaginados = Grado::query()
             ->where('ciclo_lectivo_id', $cicloActivo->id)
             ->where('estado', true)
@@ -155,7 +152,6 @@ class CopaLecheController extends Controller implements HasMiddleware
             ->paginate(5, ['*'], 'page')
             ->withQueryString();
 
-        // 3. Consulta paginada del Padrón Rápido de Alumnos (insensible a mayúsculas/minúsculas)
         $alumnosPadron = Matricula::query()
             ->join('alumnos', 'matriculas.alumno_id', '=', 'alumnos.id')
             ->join('grados', 'matriculas.grado_id', '=', 'grados.id')
@@ -345,13 +341,9 @@ class CopaLecheController extends Controller implements HasMiddleware
 
         $spreadsheet = new Spreadsheet();
 
-        // =========================================================================
-        // HOJA 1: RESUMEN GENERAL, POR TURNO Y DESGLOSE POR GRADO
-        // =========================================================================
         $sheet = $spreadsheet->getActiveSheet();
         $sheet->setTitle('Resumen por Turno y Grado');
 
-        // Encabezado Institucional
         $sheet->mergeCells('A1:E1');
         $sheet->setCellValue('A1', 'ESCUELA N° 129 "DR. MARIANO BOEDO" — REPORTE DE PROYECCIÓN COPA DE LECHE');
         $sheet->getStyle('A1')->applyFromArray([
@@ -370,7 +362,6 @@ class CopaLecheController extends Controller implements HasMiddleware
         ]);
         $sheet->getRowDimension(2)->setRowHeight(20);
 
-        // Cuadro Resumen General (Totales)
         $sheet->mergeCells('A4:E4');
         $sheet->setCellValue('A4', '1. RESUMEN GENERAL DE RACIONES DIARIAS');
         $sheet->getStyle('A4:E4')->applyFromArray([
@@ -405,7 +396,6 @@ class CopaLecheController extends Controller implements HasMiddleware
             $fila++;
         }
 
-        // Helper para dibujar bloque de cada turno
         $escribirBloqueTurno = function (Worksheet $s, int $filaInicio, string $tituloBloque, string $colorHeader, string $colorSubtotal, $listaGrados, int $subRaciones, int $subMatriculados): int {
             $f = $filaInicio + 1;
 
@@ -507,7 +497,6 @@ class CopaLecheController extends Controller implements HasMiddleware
             $matriculadosTarde
         );
 
-        // Fila Total Final
         $fila++;
         $porcTotal = $totalMatriculados > 0 ? round(($totalRaciones / $totalMatriculados) * 100) . '%' : '0%';
         $sheet->setCellValue("A{$fila}", 'TOTAL GENERAL DIARIO (MAÑANA + TARDE)');
@@ -524,7 +513,6 @@ class CopaLecheController extends Controller implements HasMiddleware
         $sheet->getStyle("B{$fila}:E{$fila}")->getAlignment()->setHorizontal(Alignment::HORIZONTAL_CENTER);
         $sheet->getRowDimension($fila)->setRowHeight(24);
 
-        // Bloque de Firmas al pie de la planilla
         $fila += 3;
         $sheet->mergeCells("A{$fila}:B{$fila}");
         $sheet->setCellValue("A{$fila}", '________________________________________');
@@ -554,9 +542,6 @@ class CopaLecheController extends Controller implements HasMiddleware
         $sheet->getPageSetup()->setFitToWidth(1);
         $sheet->getPageSetup()->setFitToHeight(1);
 
-        // =========================================================================
-        // HOJA 2: NÓMINA NOMINAL POR AULA (PARA CONTROL EN COCINA / AULAS)
-        // =========================================================================
         $sheetNomina = new Worksheet($spreadsheet, 'Nómina por Aula');
         $spreadsheet->addSheet($sheetNomina);
 

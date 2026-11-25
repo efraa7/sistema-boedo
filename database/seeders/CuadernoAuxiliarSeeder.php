@@ -68,22 +68,19 @@ class CuadernoAuxiliarSeeder extends Seeder
                     ]
                 );
 
-                // Excluir alumnos con legajo de inclusión (se evalúan por PPI)
                 $alumnosRegulares = $grado->matriculas
                     ->pluck('alumno')
                     ->filter(fn ($al) => $al && $al->estado && ! in_array((int) $al->id, $alumnosInclusionIds, true))
                     ->values();
 
-                // Notas posibles entre 6 y 10 (en enteros y medios puntos)
                 $escalaNotas = [6.0, 6.5, 7.0, 7.5, 8.0, 8.5, 9.0, 9.5, 10.0];
 
                 foreach ($alumnosRegulares as $idx => $alumno) {
-                    // Definir un perfil de rendimiento distinto por alumno para variedad realista
                     $perfil = ($idx + $ciclo->anio + $grado->numero) % 3;
                     $rangoIndices = match ($perfil) {
-                        0 => [5, 8], // Notas altas: 8.5 a 10.0
-                        1 => [2, 6], // Notas medias-altas: 7.0 a 9.0
-                        default => [0, 4], // Notas aprobadas base: 6.0 a 8.0
+                        0 => [5, 8],
+                        1 => [2, 6],
+                        default => [0, 4],
                     };
 
                     $notasGeneradas = [];

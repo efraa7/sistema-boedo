@@ -79,7 +79,6 @@ class EstadisticaController extends Controller implements HasMiddleware
      */
     private function calcularMetricasCiclo(CicloLectivo $ciclo, string $turno = ''): array
     {
-        // 1. Grados activos del ciclo
         $gradosBase = Grado::query()
             ->where('ciclo_lectivo_id', $ciclo->id)
             ->where('estado', true)
@@ -87,13 +86,11 @@ class EstadisticaController extends Controller implements HasMiddleware
 
         $cantidadGrados = (clone $gradosBase)->count();
 
-        // 2. Docentes titulares distintos asignados a grados en este ciclo
         $cantidadDocentes = (clone $gradosBase)
             ->whereNotNull('docente_titular_id')
             ->distinct('docente_titular_id')
             ->count('docente_titular_id');
 
-        // 3. Alumnos matriculados en grados activos del ciclo
         $filtroGradoCiclo = function ($q) use ($ciclo, $turno) {
             $q->where('ciclo_lectivo_id', $ciclo->id)
                 ->where('estado', true)
@@ -105,21 +102,17 @@ class EstadisticaController extends Controller implements HasMiddleware
             ->whereHas('matriculas.grado', $filtroGradoCiclo)
             ->count();
 
-        // 4. Alumnos con Legajo de Inclusión matriculados en este ciclo
         $cantidadInclusion = Alumno::query()
             ->where('estado', true)
             ->whereHas('legajoInclusion')
             ->whereHas('matriculas.grado', $filtroGradoCiclo)
             ->count();
 
-        // 5. Alumnos beneficiarios de Copa de Leche matriculados en este ciclo
         $cantidadCopaLeche = Alumno::query()
             ->where('estado', true)
             ->where('recibe_copa_leche', true)
             ->whereHas('matriculas.grado', $filtroGradoCiclo)
             ->count();
-
-        // 6. Distribución de matrícula por grado (1.º a 7.º)
         $matriculasPorNumero = Matricula::query()
             ->join('alumnos', 'matriculas.alumno_id', '=', 'alumnos.id')
             ->join('grados', 'matriculas.grado_id', '=', 'grados.id')
@@ -139,8 +132,6 @@ class EstadisticaController extends Controller implements HasMiddleware
                 'cantidad' => (int) ($matriculasPorNumero[$num] ?? 0),
             ];
         }
-
-        // 7. Promedio general de notas y promedio por grado (cuadernos visados/aprobados, excluyendo inclusión)
         $calificaciones = Calificacion::query()
             ->whereHas('cuadernoAuxiliar', function ($q) use ($ciclo, $turno) {
                 $q->where('ciclo_lectivo_id', $ciclo->id)

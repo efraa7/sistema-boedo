@@ -61,6 +61,7 @@ interface Props {
         grado_id: string;
         buscar?: string;
         orden?: string;
+        estado_prioridad?: string;
     };
 }
 
@@ -95,17 +96,16 @@ export default function CuadernosIndex({
     const { can, hasRole } = useAuth();
     const [showModal, setShowModal] = useState(false);
 
-    // Estado para modal de exportación múltiple a Excel
     const [modalExportarAbierto, setModalExportarAbierto] = useState(false);
     const [filtroModal, setFiltroModal] = useState('');
     const [periodoModal, setPeriodoModal] = useState('');
     const [seleccionados, setSeleccionados] = useState<number[]>([]);
 
-    // Estados de filtros de la tabla
     const [cicloFiltro, setCicloFiltro] = useState(filtros.ciclo_id ?? '');
     const [periodoFiltro, setPeriodoFiltro] = useState(filtros.periodo ?? '');
     const [buscarFiltro, setBuscarFiltro] = useState(filtros.buscar ?? '');
     const [ordenFiltro, setOrdenFiltro] = useState(filtros.orden ?? 'grado_asc');
+    const [estadoPrioridadFiltro, setEstadoPrioridadFiltro] = useState(filtros.estado_prioridad ?? '');
 
     const debounceRef = useRef<ReturnType<typeof setTimeout> | null>(null);
 
@@ -119,7 +119,8 @@ export default function CuadernosIndex({
         nuevoCiclo = cicloFiltro,
         nuevoPeriodo = periodoFiltro,
         nuevoBuscar = buscarFiltro,
-        nuevoOrden = ordenFiltro
+        nuevoOrden = ordenFiltro,
+        nuevaPrioridad = estadoPrioridadFiltro
     ) => {
         const params: Record<string, string> = {};
 
@@ -127,6 +128,7 @@ export default function CuadernosIndex({
         if (nuevoPeriodo) params.periodo = nuevoPeriodo;
         if (nuevoBuscar.trim()) params.buscar = nuevoBuscar.trim();
         if (nuevoOrden && nuevoOrden !== 'grado_asc') params.orden = nuevoOrden;
+        if (nuevaPrioridad) params.estado_prioridad = nuevaPrioridad;
 
         router.get('/cuadernos', params, { preserveState: true, replace: true });
     };
@@ -139,7 +141,7 @@ export default function CuadernosIndex({
         }
 
         debounceRef.current = setTimeout(() => {
-            navegarConFiltros(cicloFiltro, periodoFiltro, valor, ordenFiltro);
+            navegarConFiltros(cicloFiltro, periodoFiltro, valor, ordenFiltro, estadoPrioridadFiltro);
         }, 300);
     };
 
@@ -148,7 +150,7 @@ export default function CuadernosIndex({
         if (debounceRef.current) {
             clearTimeout(debounceRef.current);
         }
-        navegarConFiltros(cicloFiltro, periodoFiltro, buscarFiltro, ordenFiltro);
+        navegarConFiltros(cicloFiltro, periodoFiltro, buscarFiltro, ordenFiltro, estadoPrioridadFiltro);
     };
 
     const limpiarFiltros = () => {
@@ -161,6 +163,7 @@ export default function CuadernosIndex({
         setPeriodoFiltro('');
         setBuscarFiltro('');
         setOrdenFiltro('grado_asc');
+        setEstadoPrioridadFiltro('');
 
         router.get('/cuadernos', {}, { preserveState: true, replace: true });
     };
@@ -332,13 +335,11 @@ export default function CuadernosIndex({
                     </div>
                 </div>
 
-                {/* Barra de Filtros, Búsqueda directa y Ordenamiento */}
                 <form
                     onSubmit={handleBuscarSubmit}
                     className="grid gap-3 rounded-lg border bg-card p-4 shadow-sm sm:grid-cols-2 lg:grid-cols-12"
                 >
-                    {/* Buscador directo por grado, división o docente */}
-                    <div className="lg:col-span-4">
+                    <div className="sm:col-span-2 lg:col-span-3">
                         <label className="mb-1 block text-xs font-medium text-muted-foreground">
                             Buscar Grado, División o Docente
                         </label>
@@ -364,7 +365,28 @@ export default function CuadernosIndex({
                         </div>
                     </div>
 
-                    {/* Filtro por Período */}
+                    <div className="lg:col-span-2">
+                        <label className="mb-1 block text-xs font-medium text-muted-foreground">
+                            Mostrar primero
+                        </label>
+                        <select
+                            value={estadoPrioridadFiltro}
+                            onChange={(e) => {
+                                const nuevaPrioridad = e.target.value;
+                                setEstadoPrioridadFiltro(nuevaPrioridad);
+                                navegarConFiltros(cicloFiltro, periodoFiltro, buscarFiltro, ordenFiltro, nuevaPrioridad);
+                            }}
+                            className="w-full rounded-md border border-input bg-background px-3 py-2 text-sm"
+                        >
+                            <option value="">Orden general</option>
+                            {(hasRole('docente') || hasRole('super-admin')) && (
+                                <option value="borrador">Borrador</option>
+                            )}
+                            <option value="enviado_vicedireccion">En Vicedirección</option>
+                            <option value="aprobado">Visado y Aprobado</option>
+                        </select>
+                    </div>
+
                     <div className="lg:col-span-2">
                         <label className="mb-1 block text-xs font-medium text-muted-foreground">Período</label>
                         <select
@@ -372,7 +394,7 @@ export default function CuadernosIndex({
                             onChange={(e) => {
                                 const nuevoPeriodo = e.target.value;
                                 setPeriodoFiltro(nuevoPeriodo);
-                                navegarConFiltros(cicloFiltro, nuevoPeriodo, buscarFiltro, ordenFiltro);
+                                navegarConFiltros(cicloFiltro, nuevoPeriodo, buscarFiltro, ordenFiltro, estadoPrioridadFiltro);
                             }}
                             className="w-full rounded-md border border-input bg-background px-3 py-2 text-sm"
                         >
@@ -384,7 +406,6 @@ export default function CuadernosIndex({
                         </select>
                     </div>
 
-                    {/* Selector de Ordenamiento (Grado o División Asc/Desc) */}
                     <div className="lg:col-span-2">
                         <label className="mb-1 flex items-center gap-1 text-xs font-medium text-muted-foreground">
                             <ArrowUpDown className="h-3 w-3" /> Ordenar por
@@ -394,7 +415,7 @@ export default function CuadernosIndex({
                             onChange={(e) => {
                                 const nuevoOrden = e.target.value;
                                 setOrdenFiltro(nuevoOrden);
-                                navegarConFiltros(cicloFiltro, periodoFiltro, buscarFiltro, nuevoOrden);
+                                navegarConFiltros(cicloFiltro, periodoFiltro, buscarFiltro, nuevoOrden, estadoPrioridadFiltro);
                             }}
                             className="w-full rounded-md border border-input bg-background px-3 py-2 text-sm"
                         >
@@ -405,7 +426,6 @@ export default function CuadernosIndex({
                         </select>
                     </div>
 
-                    {/* Filtro por Ciclo Lectivo */}
                     <div className="lg:col-span-2">
                         <label className="mb-1 block text-xs font-medium text-muted-foreground">Ciclo Lectivo</label>
                         <select
@@ -413,7 +433,7 @@ export default function CuadernosIndex({
                             onChange={(e) => {
                                 const nuevoCiclo = e.target.value;
                                 setCicloFiltro(nuevoCiclo);
-                                navegarConFiltros(nuevoCiclo, periodoFiltro, buscarFiltro, ordenFiltro);
+                                navegarConFiltros(nuevoCiclo, periodoFiltro, buscarFiltro, ordenFiltro, estadoPrioridadFiltro);
                             }}
                             className="w-full rounded-md border border-input bg-background px-3 py-2 text-sm"
                         >
@@ -426,19 +446,19 @@ export default function CuadernosIndex({
                         </select>
                     </div>
 
-                    {/* Botón Restablecer */}
-                    <div className="flex items-end lg:col-span-2">
+                    <div className="flex items-end lg:col-span-1">
                         <button
                             type="button"
                             onClick={limpiarFiltros}
-                            className="inline-flex w-full items-center justify-center gap-1.5 rounded-md border px-3 py-2 text-sm font-medium hover:bg-muted"
+                            title="Restablecer filtros"
+                            className="inline-flex w-full items-center justify-center gap-1.5 rounded-md border px-2.5 py-2 text-sm font-medium hover:bg-muted"
                         >
-                            <RotateCcw className="h-3.5 w-3.5" /> Restablecer
+                            <RotateCcw className="h-3.5 w-3.5 shrink-0" />
+                            <span className="lg:hidden 2xl:inline">Restablecer</span>
                         </button>
                     </div>
                 </form>
 
-                {/* Tabla de Cuadernos */}
                 <div className="overflow-hidden rounded-lg border bg-card shadow-sm">
                     <table className="w-full text-left text-sm">
                         <thead className="border-b bg-muted/50 text-xs uppercase text-muted-foreground">
@@ -543,7 +563,6 @@ export default function CuadernosIndex({
                     )}
                 </div>
 
-                {/* Modal Nueva Hoja de Trimestre */}
                 {showModal && (
                     <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/50 p-4 backdrop-blur-xs">
                         <div className="w-full max-w-md rounded-lg border bg-card p-6 shadow-xl">
@@ -619,7 +638,6 @@ export default function CuadernosIndex({
                     </div>
                 )}
 
-                {/* Modal Exportar Planillas a Excel */}
                 {modalExportarAbierto && (
                     <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/50 p-4">
                         <div className="flex max-h-[90vh] w-full max-w-2xl flex-col rounded-lg border bg-card p-6 shadow-xl">
