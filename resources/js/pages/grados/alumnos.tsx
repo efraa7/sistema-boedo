@@ -1,0 +1,204 @@
+import AppLayout from '@/layouts/app-layout';
+import { type BreadcrumbItem } from '@/types';
+import { Head, Link } from '@inertiajs/react';
+import { ArrowLeft, Coffee, FileSpreadsheet, GraduationCap, Search, Users, X } from 'lucide-react';
+import { useMemo, useState } from 'react';
+
+interface AlumnoGradoItem {
+    id: number;
+    matricula_id: number;
+    legajo: string;
+    apellido: string;
+    nombre: string;
+    dni: string;
+    fecha_nacimiento: string;
+    tutor_nombre: string;
+    tutor_telefono: string;
+    recibe_copa_leche: boolean;
+    estado: boolean;
+}
+
+interface GradoAlumnosInfo {
+    id: number;
+    nombre_completo: string;
+    numero: number;
+    division: string;
+    turno: string;
+    aula: string | null;
+    ciclo_anio: number | null;
+    docente_titular: string | null;
+}
+
+interface Props {
+    grado: GradoAlumnosInfo;
+    alumnos: AlumnoGradoItem[];
+}
+
+export default function GradoAlumnos({ grado, alumnos }: Props) {
+    const breadcrumbs: BreadcrumbItem[] = [
+        { title: 'Dashboard', href: '/dashboard' },
+        { title: 'Grados y Secciones', href: '/grados' },
+        { title: `Alumnos: ${grado.numero}.° ${grado.division}`, href: `/grados/${grado.id}/alumnos` },
+    ];
+
+    const [buscar, setBuscar] = useState('');
+
+    const alumnosFiltrados = useMemo(() => {
+        const q = buscar
+            .toLowerCase()
+            .normalize('NFD')
+            .replace(/[\u0300-\u036f]/g, '')
+            .trim();
+
+        if (!q) return alumnos;
+
+        return alumnos.filter((al) => {
+            const texto = `${al.apellido} ${al.nombre} ${al.dni} ${al.legajo} ${al.tutor_nombre}`
+                .toLowerCase()
+                .normalize('NFD')
+                .replace(/[\u0300-\u036f]/g, '');
+            return texto.includes(q);
+        });
+    }, [alumnos, buscar]);
+
+    return (
+        <AppLayout breadcrumbs={breadcrumbs}>
+            <Head title={`Alumnos - ${grado.nombre_completo}`} />
+
+            <div className="flex flex-col gap-6 p-6">
+                <div className="flex flex-col justify-between gap-4 sm:flex-row sm:items-center">
+                    <div>
+                        <div className="flex items-center gap-2">
+                            <GraduationCap className="h-6 w-6 text-primary" />
+                            <h1 className="text-2xl font-bold tracking-tight">{grado.nombre_completo}</h1>
+                        </div>
+                        <p className="mt-1 text-sm text-muted-foreground">
+                            Ciclo Lectivo {grado.ciclo_anio ?? '—'} · Docente Titular:{' '}
+                            <span className="font-medium text-foreground">
+                                {grado.docente_titular || 'Sin asignar'}
+                            </span>
+                            {grado.aula ? ` · Aula: ${grado.aula}` : ''}
+                        </p>
+                    </div>
+
+                    <div className="flex flex-wrap items-center gap-2">
+                        <a
+                            href={`/grados/exportar-excel?grados[]=${grado.id}`}
+                            className="inline-flex items-center gap-2 rounded-md border border-emerald-500/30 bg-emerald-500/10 px-4 py-2 text-sm font-medium text-emerald-700 hover:bg-emerald-500/20 dark:text-emerald-300"
+                        >
+                            <FileSpreadsheet className="h-4 w-4" />
+                            Descargar Nómina Excel
+                        </a>
+
+                        <Link
+                            href="/grados"
+                            className="inline-flex items-center gap-2 rounded-md border bg-background px-4 py-2 text-sm font-medium hover:bg-muted"
+                        >
+                            <ArrowLeft className="h-4 w-4" />
+                            Volver a Grados
+                        </Link>
+                    </div>
+                </div>
+
+                {/* Barra de búsqueda y contador */}
+                <div className="flex flex-col justify-between gap-3 sm:flex-row sm:items-center">
+                    <div className="relative w-full max-w-md">
+                        <Search className="absolute top-1/2 left-3 h-4 w-4 -translate-y-1/2 text-muted-foreground" />
+                        <input
+                            type="text"
+                            value={buscar}
+                            onChange={(e) => setBuscar(e.target.value)}
+                            placeholder="Filtrar alumno por apellido, nombre, DNI, legajo o tutor..."
+                            className="w-full rounded-md border bg-background py-2 pr-8 pl-9 text-sm shadow-xs focus:border-primary focus:outline-none"
+                        />
+                        {buscar && (
+                            <button
+                                type="button"
+                                onClick={() => setBuscar('')}
+                                className="absolute top-1/2 right-2.5 -translate-y-1/2 text-muted-foreground hover:text-foreground"
+                            >
+                                <X className="h-3.5 w-3.5" />
+                            </button>
+                        )}
+                    </div>
+
+                    <div className="inline-flex items-center gap-2 rounded-md border bg-muted/30 px-3 py-1.5 text-xs font-medium text-muted-foreground">
+                        <Users className="h-4 w-4 text-primary" />
+                        Mostrando <strong className="text-foreground">{alumnosFiltrados.length}</strong> de{' '}
+                        <strong className="text-foreground">{alumnos.length}</strong> alumnos matriculados
+                    </div>
+                </div>
+
+                <div className="overflow-x-auto rounded-lg border bg-card shadow-sm">
+                    <table className="w-full text-left text-sm">
+                        <thead className="border-b bg-muted/50 text-xs uppercase text-muted-foreground">
+                            <tr>
+                                <th className="px-4 py-3 text-center">#</th>
+                                <th className="px-4 py-3">Legajo</th>
+                                <th className="px-4 py-3">Apellido y Nombre</th>
+                                <th className="px-4 py-3">DNI</th>
+                                <th className="px-4 py-3">Fecha Nac.</th>
+                                <th className="px-4 py-3">Tutor / Teléfono</th>
+                                <th className="px-4 py-3 text-center">Copa de Leche</th>
+                                <th className="px-4 py-3 text-center">Condición</th>
+                            </tr>
+                        </thead>
+                        <tbody className="divide-y">
+                            {alumnosFiltrados.length === 0 ? (
+                                <tr>
+                                    <td colSpan={8} className="px-4 py-8 text-center text-muted-foreground">
+                                        {alumnos.length === 0
+                                            ? 'Este grado aún no tiene alumnos matriculados.'
+                                            : 'Ningún alumno coincide con el filtro ingresado.'}
+                                    </td>
+                                </tr>
+                            ) : (
+                                alumnosFiltrados.map((al, index) => (
+                                    <tr key={al.matricula_id} className="hover:bg-muted/30">
+                                        <td className="px-4 py-3 text-center text-xs text-muted-foreground">
+                                            {index + 1}
+                                        </td>
+                                        <td className="px-4 py-3 font-mono text-xs">{al.legajo}</td>
+                                        <td className="px-4 py-3 font-semibold">
+                                            {al.apellido}, {al.nombre}
+                                        </td>
+                                        <td className="px-4 py-3 font-mono text-xs">{al.dni}</td>
+                                        <td className="px-4 py-3 text-xs text-muted-foreground">
+                                            {al.fecha_nacimiento}
+                                        </td>
+                                        <td className="px-4 py-3">
+                                            <div className="text-xs font-medium">{al.tutor_nombre}</div>
+                                            <div className="font-mono text-[11px] text-muted-foreground">
+                                                {al.tutor_telefono}
+                                            </div>
+                                        </td>
+                                        <td className="px-4 py-3 text-center">
+                                            {al.recibe_copa_leche ? (
+                                                <span className="inline-flex items-center gap-1 rounded-full bg-amber-500/15 px-2.5 py-0.5 text-xs font-medium text-amber-700 dark:text-amber-300">
+                                                    <Coffee className="h-3 w-3" /> Sí
+                                                </span>
+                                            ) : (
+                                                <span className="text-xs text-muted-foreground">No</span>
+                                            )}
+                                        </td>
+                                        <td className="px-4 py-3 text-center">
+                                            {al.estado ? (
+                                                <span className="inline-flex rounded-full bg-green-500/15 px-2.5 py-0.5 text-xs font-medium text-green-700 dark:text-green-400">
+                                                    Regular
+                                                </span>
+                                            ) : (
+                                                <span className="inline-flex rounded-full bg-red-500/15 px-2.5 py-0.5 text-xs font-medium text-red-700 dark:text-red-400">
+                                                    Inactivo / Pase
+                                                </span>
+                                            )}
+                                        </td>
+                                    </tr>
+                                ))
+                            )}
+                        </tbody>
+                    </table>
+                </div>
+            </div>
+        </AppLayout>
+    );
+} 
