@@ -1,8 +1,18 @@
 import AppLayout from '@/layouts/app-layout';
 import { type BreadcrumbItem } from '@/types';
-import { Head, Link } from '@inertiajs/react';
-import { ArrowLeft, Coffee, FileSpreadsheet, GraduationCap, Search, Users, X } from 'lucide-react';
-import { useMemo, useState } from 'react';
+import { Head, Link, router } from '@inertiajs/react';
+import {
+    ArrowLeft,
+    ChevronLeft,
+    ChevronRight,
+    Coffee,
+    FileSpreadsheet,
+    GraduationCap,
+    Search,
+    Users,
+    X,
+} from 'lucide-react';
+import { FormEvent, useRef, useState } from 'react';
 
 interface AlumnoGradoItem {
     id: number;
@@ -18,6 +28,22 @@ interface AlumnoGradoItem {
     estado: boolean;
 }
 
+interface PaginationLink {
+    url: string | null;
+    label: string;
+    active: boolean;
+}
+
+interface PaginatedAlumnos {
+    data: AlumnoGradoItem[];
+    current_page: number;
+    last_page: number;
+    from: number | null;
+    to: number | null;
+    total: number;
+    links: PaginationLink[];
+}
+
 interface GradoAlumnosInfo {
     id: number;
     nombre_completo: string;
@@ -31,35 +57,62 @@ interface GradoAlumnosInfo {
 
 interface Props {
     grado: GradoAlumnosInfo;
-    alumnos: AlumnoGradoItem[];
+    alumnos: PaginatedAlumnos;
+    totalMatriculados: number;
+    filtros: {
+        buscar?: string;
+    };
 }
 
-export default function GradoAlumnos({ grado, alumnos }: Props) {
+export default function GradoAlumnos({ grado, alumnos, totalMatriculados, filtros }: Props) {
     const breadcrumbs: BreadcrumbItem[] = [
         { title: 'Dashboard', href: '/dashboard' },
         { title: 'Grados y Secciones', href: '/grados' },
         { title: `Alumnos: ${grado.numero}.° ${grado.division}`, href: `/grados/${grado.id}/alumnos` },
     ];
 
-    const [buscar, setBuscar] = useState('');
+    const [buscar, setBuscar] = useState(filtros?.buscar ?? '');
+    const debounceRef = useRef<ReturnType<typeof setTimeout> | null>(null);
 
-    const alumnosFiltrados = useMemo(() => {
-        const q = buscar
-            .toLowerCase()
-            .normalize('NFD')
-            .replace(/[\u0300-\u036f]/g, '')
-            .trim();
+    const navegarBusqueda = (valor: string) => {
+        const params: Record<string, string> = {};
+        if (valor.trim()) {
+            params.buscar = valor.trim();
+        }
 
-        if (!q) return alumnos;
-
-        return alumnos.filter((al) => {
-            const texto = `${al.apellido} ${al.nombre} ${al.dni} ${al.legajo} ${al.tutor_nombre}`
-                .toLowerCase()
-                .normalize('NFD')
-                .replace(/[\u0300-\u036f]/g, '');
-            return texto.includes(q);
+        router.get(`/grados/${grado.id}/alumnos`, params, {
+            preserveState: true,
+            replace: true,
         });
-    }, [alumnos, buscar]);
+    };
+
+    const handleBuscarChange = (valor: string) => {
+        setBuscar(valor);
+
+        if (debounceRef.current) {
+            clearTimeout(debounceRef.current);
+        }
+
+        debounceRef.current = setTimeout(() => {
+            navegarBusqueda(valor);
+        }, 300);
+    };
+
+    const handleBuscarSubmit = (e: FormEvent) => {
+        e.preventDefault();
+        if (debounceRef.current) {
+            clearTimeout(debounceRef.current);
+        }
+        navegarBusqueda(buscar);
+    };
+
+    const limpiarBusqueda = () => {
+        if (debounceRef.current) {
+            clearTimeout(debounceRef.current);
+        }
+        setBuscar('');
+        navegarBusqueda('');
+    };
 
     return (
         <AppLayout breadcrumbs={breadcrumbs}>
@@ -100,32 +153,40 @@ export default function GradoAlumnos({ grado, alumnos }: Props) {
                     </div>
                 </div>
 
-                {/* Barra de búsqueda y contador */}
                 <div className="flex flex-col justify-between gap-3 sm:flex-row sm:items-center">
-                    <div className="relative w-full max-w-md">
+                    <form onSubmit={handleBuscarSubmit} className="relative w-full max-w-md">
                         <Search className="absolute top-1/2 left-3 h-4 w-4 -translate-y-1/2 text-muted-foreground" />
                         <input
                             type="text"
                             value={buscar}
-                            onChange={(e) => setBuscar(e.target.value)}
+                            onChange={(e) => handleBuscarChange(e.target.value)}
                             placeholder="Filtrar alumno por apellido, nombre, DNI, legajo o tutor..."
                             className="w-full rounded-md border bg-background py-2 pr-8 pl-9 text-sm shadow-xs focus:border-primary focus:outline-none"
                         />
                         {buscar && (
                             <button
                                 type="button"
-                                onClick={() => setBuscar('')}
+                                onClick={limpiarBusqueda}
                                 className="absolute top-1/2 right-2.5 -translate-y-1/2 text-muted-foreground hover:text-foreground"
+                                title="Limpiar búsqueda"
                             >
                                 <X className="h-3.5 w-3.5" />
                             </button>
                         )}
-                    </div>
+                    </form>
 
                     <div className="inline-flex items-center gap-2 rounded-md border bg-muted/30 px-3 py-1.5 text-xs font-medium text-muted-foreground">
                         <Users className="h-4 w-4 text-primary" />
-                        Mostrando <strong className="text-foreground">{alumnosFiltrados.length}</strong> de{' '}
-                        <strong className="text-foreground">{alumnos.length}</strong> alumnos matriculados
+                        {filtros?.buscar ? (
+                            <span>
+                                <strong className="text-foreground">{alumnos.total}</strong> coincidencias de{' '}
+                                <strong className="text-foreground">{totalMatriculados}</strong> matriculados
+                            </span>
+                        ) : (
+                            <span>
+                                Total: <strong className="text-foreground">{totalMatriculados}</strong> alumnos matriculados
+                            </span>
+                        )}
                     </div>
                 </div>
 
@@ -144,19 +205,19 @@ export default function GradoAlumnos({ grado, alumnos }: Props) {
                             </tr>
                         </thead>
                         <tbody className="divide-y">
-                            {alumnosFiltrados.length === 0 ? (
+                            {alumnos.data.length === 0 ? (
                                 <tr>
                                     <td colSpan={8} className="px-4 py-8 text-center text-muted-foreground">
-                                        {alumnos.length === 0
+                                        {totalMatriculados === 0
                                             ? 'Este grado aún no tiene alumnos matriculados.'
                                             : 'Ningún alumno coincide con el filtro ingresado.'}
                                     </td>
                                 </tr>
                             ) : (
-                                alumnosFiltrados.map((al, index) => (
+                                alumnos.data.map((al, index) => (
                                     <tr key={al.matricula_id} className="hover:bg-muted/30">
                                         <td className="px-4 py-3 text-center text-xs text-muted-foreground">
-                                            {index + 1}
+                                            {(alumnos.from ?? 1) + index}
                                         </td>
                                         <td className="px-4 py-3 font-mono text-xs">{al.legajo}</td>
                                         <td className="px-4 py-3 font-semibold">
@@ -197,8 +258,59 @@ export default function GradoAlumnos({ grado, alumnos }: Props) {
                             )}
                         </tbody>
                     </table>
+
+                    {alumnos.last_page > 1 && (
+                        <div className="flex flex-col items-center justify-between gap-3 border-t px-4 py-3 text-xs text-muted-foreground sm:flex-row">
+                            <div>
+                                Mostrando <span className="font-semibold text-foreground">{alumnos.from ?? 0}</span> a{' '}
+                                <span className="font-semibold text-foreground">{alumnos.to ?? 0}</span> de{' '}
+                                <span className="font-semibold text-foreground">{alumnos.total}</span> alumnos
+                            </div>
+                            <div className="flex items-center gap-1">
+                                {alumnos.links.map((link, idx) => {
+                                    const esAnterior = link.label.includes('Previous');
+                                    const esSiguiente = link.label.includes('Next');
+                                    const texto = esAnterior ? (
+                                        <ChevronLeft className="h-4 w-4" />
+                                    ) : esSiguiente ? (
+                                        <ChevronRight className="h-4 w-4" />
+                                    ) : (
+                                        link.label
+                                    );
+
+                                    if (!link.url) {
+                                        return (
+                                            <span
+                                                key={idx}
+                                                className="inline-flex h-8 min-w-8 items-center justify-center rounded-md border px-2 opacity-40"
+                                            >
+                                                {texto}
+                                            </span>
+                                        );
+                                    }
+
+                                    return (
+                                        <Link
+                                            key={idx}
+                                            href={link.url}
+                                            preserveState
+                                            preserveScroll
+                                            replace
+                                            className={`inline-flex h-8 min-w-8 items-center justify-center rounded-md border px-2 font-medium transition ${
+                                                link.active
+                                                    ? 'border-primary bg-primary text-primary-foreground'
+                                                    : 'hover:bg-muted'
+                                            }`}
+                                        >
+                                            {texto}
+                                        </Link>
+                                    );
+                                })}
+                            </div>
+                        </div>
+                    )}
                 </div>
             </div>
         </AppLayout>
     );
-} 
+}

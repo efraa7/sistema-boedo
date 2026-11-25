@@ -71,6 +71,7 @@ class GradoController extends Controller implements HasMiddleware
             ->map(fn($id) => (int) $id)
             ->all();
     }
+
     private function obtenerDocentesDisponibles(?User $user)
     {
         $alcance = $this->resolverAlcanceGrados($user);
@@ -323,12 +324,36 @@ class GradoController extends Controller implements HasMiddleware
         $grado->load([
             'cicloLectivo',
             'docenteTitular',
-            'matriculas.alumno',
         ]);
 
-        $alumnos = $grado->matriculas
-            ->filter(fn($m) => $m->alumno !== null)
-            ->map(function ($matricula) {
+        $buscar = trim((string) $request->input('buscar', ''));
+
+        $totalMatriculados = $grado->matriculas()
+            ->whereHas('alumno')
+            ->count();
+
+        $alumnos = $grado->matriculas()
+            ->whereHas('alumno')
+            ->join('alumnos', 'matriculas.alumno_id', '=', 'alumnos.id')
+            ->select('matriculas.*')
+            ->with('alumno')
+            ->when($buscar !== '', function ($query) use ($buscar) {
+                $like = '%' . $buscar . '%';
+                $query->where(function ($q) use ($like) {
+                    $q->where('alumnos.apellido', 'like', $like)
+                        ->orWhere('alumnos.nombre', 'like', $like)
+                        ->orWhere('alumnos.dni', 'like', $like)
+                        ->orWhere('alumnos.legajo', 'like', $like)
+                        ->orWhere('alumnos.tutor_nombre', 'like', $like)
+                        ->orWhereRaw("CONCAT(alumnos.apellido, ' ', alumnos.nombre) LIKE ?", [$like])
+                        ->orWhereRaw("CONCAT(alumnos.nombre, ' ', alumnos.apellido) LIKE ?", [$like]);
+                });
+            })
+            ->orderBy('alumnos.apellido')
+            ->orderBy('alumnos.nombre')
+            ->paginate(5)
+            ->withQueryString()
+            ->through(function ($matricula) {
                 $al = $matricula->alumno;
 
                 return [
@@ -344,9 +369,7 @@ class GradoController extends Controller implements HasMiddleware
                     'recibe_copa_leche' => (bool) $al->recibe_copa_leche,
                     'estado' => (bool) $al->estado,
                 ];
-            })
-            ->sortBy(fn(array $item) => mb_strtoupper("{$item['apellido']} {$item['nombre']}", 'UTF-8'))
-            ->values();
+            });
 
         return Inertia::render('grados/alumnos', [
             'grado' => [
@@ -362,6 +385,10 @@ class GradoController extends Controller implements HasMiddleware
                     : null,
             ],
             'alumnos' => $alumnos,
+            'totalMatriculados' => $totalMatriculados,
+            'filtros' => [
+                'buscar' => $buscar,
+            ],
         ]);
     }
 
